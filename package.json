@@ -1,14 +1,15 @@
 {
-  "name": "typescript-web-crawler",
+  "name": "sample-crawler-using-playwright-ts",
   "version": "1.0.0",
-  "description": "A web crawler using TypeScript and Playwright",
+  "description": "A sample web crawler using TypeScript and Playwright",
   "main": "dist/main.js",
   "scripts": {
+    "prepare": "husky install",
     "build": "webpack",
     "start": "node dist/main.js -u ${npm_config_u} -b ${npm_config_b}",
     "lint": "eslint \"src/**/*.ts\"",
     "lint:fix": "eslint \"src/**/*.ts\" --fix",
-    "commit": "cz"
+    "cz": "node_modules/.bin/cz"
   },
   "dependencies": {
     "commander": "^8.3.0",
@@ -32,5 +33,10 @@
     "webpack": "^5.65.0",
     "webpack-cli": "^4.9.1",
     "webpack-node-externals": "^3.0.0"
+  },
+  "config": {
+    "commitizen": {
+      "path": "./node_modules/cz-conventional-changelog"
+    }
   }
 }
