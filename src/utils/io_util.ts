@@ -48,6 +48,11 @@ export const serialize = (_data: any): string => {
   } else {
     result = `${_data}`;
   }
+  result = result.replaceAll('\\\\n', '\\n');
+  result = result.replaceAll('\\\\r', '\\r');
+  result = result.replaceAll('\\\\t', '\\t');
+  result = result.replaceAll('\\\\f', '\\f');
+  result = result.replaceAll('\\\\v', '\\v');
   return escape(result);
 };
 

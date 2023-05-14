@@ -9,7 +9,10 @@ import * as setUtil from '../utils/set_util';
 export type CrawledResult = {
   url: string;
   title: string;
+  keywords: string;
+  description: string;
   content: string;
+  bodyText: string;
   links: Set<string>;
   redirectedUrls: { [key: string]: string };
   jsFiles: { [key: string]: string };
@@ -25,7 +28,10 @@ const crawl = async (url: string, browserType: BrowserType): Promise<CrawledResu
   const result: CrawledResult = {
     url: "",
     title: "",
+    keywords: "",
+    description: "",
     content: "",
+    bodyText: "",
     links: new Set(),
     redirectedUrls: {},
     jsFiles: {}
@@ -56,7 +62,7 @@ const crawl = async (url: string, browserType: BrowserType): Promise<CrawledResu
     };
     page.on('response', responseHandler); // 全てのコンテンツのresponseイベントを捕捉
 
-    await page.goto(url);
+    await page.goto(url, {waitUntil: 'networkidle'});
   
     // タイトルを抽出
     result.title = await page.title();
@@ -64,19 +70,60 @@ const crawl = async (url: string, browserType: BrowserType): Promise<CrawledResu
     // コンテンツを抽出
     result.content = await page.content();
 
+    // ページに設定されているキーワードを抽出
+    const keywordsElementLocator = page.locator('meta[name="keywords"]');
+    const keywordsElements = await keywordsElementLocator.all();
+    if (keywordsElements && keywordsElements.length > 0) {
+      let keywords = await keywordsElements[0].getAttribute('content');
+      if (keywords) {
+        keywords = keywords.trim();
+        keywords = keywords.replace(/\r/g, '\n');
+        keywords = keywords.replace(/\n+/g, '\\n');
+        result.keywords = keywords.replace(/\s+/g, ' ');
+      }
+    }
+
+    // ページに設定されている説明文を抽出
+    const descriptionElementLocator = page.locator('meta[name="description"]').first();
+    const descriptionElements = await descriptionElementLocator.all();
+    if (descriptionElements && descriptionElements.length > 0) {
+      let description = await descriptionElements[0].getAttribute('content');
+      if (description) {
+        description = description.trim();
+        description = description.replace(/\r/g, '\n');
+        description = description.replace(/\n+/g, '\\n');
+        result.description = description.replace(/\s+/g, ' ');
+      }
+    }
+
+    // ページ全体のテキストを抽出
+    const bodyElementLocator = page.locator('body').first();
+    const bodyElements = await bodyElementLocator.all();
+    if (bodyElements && bodyElements.length > 0) {
+      let bodyText = await bodyElements[0].innerText();
+      if (bodyText) {
+        bodyText = bodyText.trim();
+        bodyText = bodyText.replace(/\r/g, '\n');
+        bodyText = bodyText.replace(/\n+/g, '\\n');
+        result.bodyText = bodyText.replace(/\s+/g, ' ');
+      }
+    }
+
     // リンク一覧を抽出
     const linkLocators = page.locator('a');
     const anchors = await linkLocators.all();
-    for (const anchor of anchors) {
-      if (!anchor.isVisible() && !anchor.isEnabled()) {
-        continue;
-      }
-      const linkHref = await anchor.getAttribute('href');
-      if (linkHref && typeof linkHref === 'string') {
-        const linkUrl = new URL(linkHref, url).toString().trim(); // 相対URLを絶対URLに変換します。
-        if (linkUrl && linkUrl !== url) {
-          if (!linkUrl.match(ignoredLinkFilterRegex)) {
-            result.links.add(linkUrl);
+    if (anchors && anchors.length > 0) {
+      for (const anchor of anchors) {
+        if (!anchor || !anchor.isVisible() || !anchor.isEnabled()) {
+          continue;
+        }
+        const linkHref = await anchor.getAttribute('href');
+        if (linkHref && typeof linkHref === 'string') {
+          const linkUrl = new URL(linkHref, url).toString().trim(); // 相対URLを絶対URLに変換します。
+          if (linkUrl && linkUrl !== url) {
+            if (!linkUrl.match(ignoredLinkFilterRegex)) {
+              result.links.add(linkUrl);
+            }
           }
         }
       }

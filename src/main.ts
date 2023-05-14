@@ -60,7 +60,12 @@ const crawlPages = (browserTypeStr: string, urlWithRules: UrlWithRule[], outputR
         }
         dirpath = `${browserDirPath}/page/${dirpath}`;
         outputStringArray([result.content], `${dirpath}/content.html`);
-        outputStringArray(Array.from(result.links), `${dirpath}/links.txt`);
+
+        const urlWithLinks: string[] = [];
+        for (const link of result.links) {
+          urlWithLinks.push(serialize({"url": result.url, "link": link}));
+        }
+        outputStringArray(urlWithLinks, `${dirpath}/links.txt`);
         outputStringArray(Array.from(internalLinks), `${dirpath}/internal_links.txt`);
         outputStringArray(Array.from(externalLinks), `${dirpath}/external_links.txt`);
 
@@ -88,8 +93,8 @@ const crawlPages = (browserTypeStr: string, urlWithRules: UrlWithRule[], outputR
         outputStringArray(jsUrls, `${dirpath}/js_urls.txt`);  // JavaScriptのURLと保存先の関連のリストを保存
 
         outputStringArray([result.url], allProcessedUrlsPath, 'a');
-        outputStringArray([serialize({"url": result.url, "title": result.title, "directory": dirpath})], allSummariesPath, 'a');
-        outputStringArray(Array.from(result.links), allLinkUrlsPath, 'a');
+        outputStringArray([serialize({"url": result.url, "title": result.title, "keywords": result.keywords, "description": result.description, "bodyText": result.bodyText, "directory": dirpath})], allSummariesPath, 'a');
+        outputStringArray(urlWithLinks, allLinkUrlsPath, 'a');
         outputStringArray(Array.from(internalLinks), allInternalLinkUrlsPath, 'a');
         outputStringArray(Array.from(externalLinks), allExternalLinkUrlsPath, 'a');
         const redirectedUrls: string[] = [];
