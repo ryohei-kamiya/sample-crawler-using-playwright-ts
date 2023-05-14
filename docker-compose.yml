@@ -1,0 +1,15 @@
+version: "3.3"
+
+services:
+  crawler:
+    build:
+      context: ./
+      dockerfile: ./Dockerfile
+    tty: true
+    working_dir: /crawler
+    container_name: sample-crawler-using-playwright-ts
+    hostname: sample-crawler-using-playwright-ts
+    volumes:
+      - ./:/crawler
+    environment:
+      TZ: Asia/Tokyo
