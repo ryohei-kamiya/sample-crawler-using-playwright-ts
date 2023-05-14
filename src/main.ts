@@ -2,7 +2,7 @@ import { program } from 'commander';
 import { Worker } from 'worker_threads';
 import { v4 as uuidv4 } from 'uuid';
 import { Semaphore } from 'async-mutex';
-import { url2dirpath, makedir, loadUrlWithRulesInFile, output } from './utils/io_util';
+import { url2dirpath, makedir, loadUrlWithRulesInFile, serialize, outputStringArray } from './utils/io_util';
 import { UrlWithRule } from './types/url_with_rule';
 import { CrawledResult } from './workers/crawler';
 
@@ -35,10 +35,12 @@ const crawlPages = (browserTypeStr: string, urlWithRules: UrlWithRule[], outputR
         const internalLinks: Set<string> = new Set();
         const externalLinks: Set<string> = new Set();
         for (let link of result.links) {
-          if (link.match(linkFilterRegex)) {
-            internalLinks.add(link);
-          } else {
-            externalLinks.add(link);
+          if (link && link.trim()) {
+            if (link.match(linkFilterRegex)) {
+              internalLinks.add(link);
+            } else {
+              externalLinks.add(link);
+            }  
           }
         }
 
@@ -57,18 +59,13 @@ const crawlPages = (browserTypeStr: string, urlWithRules: UrlWithRule[], outputR
           makedir(`${browserDirPath}/page/${dirpath}`);
         }
         dirpath = `${browserDirPath}/page/${dirpath}`;
-        output(result.content, `${dirpath}/content.html`);
-        for (const line of result.links) {
-          output(line, `${dirpath}/links.txt`, 'a');
-        }
-        for (const line of internalLinks) {
-          output(line, `${dirpath}/internal_links.txt`, 'a');
-        }
-        for (const line of externalLinks) {
-          output(line, `${dirpath}/external_links.txt`, 'a');
-        }
+        outputStringArray([result.content], `${dirpath}/content.html`);
+        outputStringArray(Array.from(result.links), `${dirpath}/links.txt`);
+        outputStringArray(Array.from(internalLinks), `${dirpath}/internal_links.txt`);
+        outputStringArray(Array.from(externalLinks), `${dirpath}/external_links.txt`);
 
         // ページ内のJavaScriptファイルを出力
+        const jsUrls: string[] = [];
         for (const [jsUrl, jsContent] of Object.entries(result.jsFiles)) {
           let jsDirpath: string = url2dirpath(jsUrl);
           try {
@@ -85,29 +82,26 @@ const crawlPages = (browserTypeStr: string, urlWithRules: UrlWithRule[], outputR
             makedir(`${browserDirPath}/js/${jsDirpath}`);
           }
           jsDirpath = `${browserDirPath}/js/${jsDirpath}`;
-          output(jsContent, `${jsDirpath}/script.js`);  // JavaScriptのURLに対応するディレクトリに保存
-          output({"url": jsUrl, "directory": `${jsDirpath}`}, `${dirpath}/js_urls.txt`);  // JavaScriptのURLと保存先の関連のリストを保存
+          outputStringArray([jsContent], `${jsDirpath}/script.js`);  // JavaScriptのURLに対応するディレクトリに保存
+          jsUrls.push(serialize({"url": jsUrl, "directory": `${jsDirpath}`}));
         }
+        outputStringArray(jsUrls, `${dirpath}/js_urls.txt`);  // JavaScriptのURLと保存先の関連のリストを保存
 
-        output(result.url, allProcessedUrlsPath, 'a');
-        output({"url": result.url, "title": result.title, "directory": dirpath}, allSummariesPath, 'a');
-        for (const line of result.links) {
-          output(line, allLinkUrlsPath, 'a');
-        }
-        for (const line of internalLinks) {
-          output(line, allInternalLinkUrlsPath, 'a');
-        }
-        for (const line of externalLinks) {
-          output(line, allExternalLinkUrlsPath, 'a');
-        }
+        outputStringArray([result.url], allProcessedUrlsPath, 'a');
+        outputStringArray([serialize({"url": result.url, "title": result.title, "directory": dirpath})], allSummariesPath, 'a');
+        outputStringArray(Array.from(result.links), allLinkUrlsPath, 'a');
+        outputStringArray(Array.from(internalLinks), allInternalLinkUrlsPath, 'a');
+        outputStringArray(Array.from(externalLinks), allExternalLinkUrlsPath, 'a');
+        const redirectedUrls: string[] = [];
         for (const [key, value] of Object.entries(result.redirectedUrls)) {
-          output({'url': key, 'location': value}, allRedirectedUrlsPath, 'a');
+          redirectedUrls.push(serialize({'url': key, 'location': value}));
         }
+        outputStringArray(redirectedUrls, allRedirectedUrlsPath, 'a');
       });
 
       worker.on('error', (error) => {
         console.error(`Error in worker: ${error.message}`);
-        output(url, allErrorUrlsPath, 'a');
+        outputStringArray([url], allErrorUrlsPath, 'a');
       });
 
       worker.on('exit', (code) => {

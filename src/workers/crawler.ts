@@ -37,11 +37,13 @@ const crawl = async (url: string, browserType: BrowserType): Promise<CrawledResu
     const responseHandler = (response: any) => {
       // リダイレクトを検出
       if (300 <= response.status() && response.status() < 400 && response.headers().location) {
-        result.redirectedUrls[response.url()] = response.headers().location;
+        if (response.url()) {
+          result.redirectedUrls[response.url()] = response.headers().location;
+        }
       }
       // JavaScriptファイルの内容を取得
       if (response.request().resourceType() === 'script') {
-        if (response.ok() && !result.jsFiles[response.url()]) {
+        if (response.ok() && response.url() && !result.jsFiles[response.url()]) {
           getJsContent(response);
         }
       }
