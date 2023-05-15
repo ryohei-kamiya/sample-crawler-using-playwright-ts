@@ -32,18 +32,6 @@ const crawlPages = (browserTypeStr: string, urlWithRules: UrlWithRule[], outputR
       worker.on('message', (result: CrawledResult) => {
         console.log(`Crawled: ${result.url}`);
 
-        const internalLinks: Set<string> = new Set();
-        const externalLinks: Set<string> = new Set();
-        for (let link of result.links) {
-          if (link && link.trim()) {
-            if (link.match(linkFilterRegex)) {
-              internalLinks.add(link);
-            } else {
-              externalLinks.add(link);
-            }  
-          }
-        }
-
         let dirpath = url2dirpath(result.url);
         try {
           makedir(`${browserDirPath}/page/${dirpath}`);
@@ -61,13 +49,23 @@ const crawlPages = (browserTypeStr: string, urlWithRules: UrlWithRule[], outputR
         dirpath = `${browserDirPath}/page/${dirpath}`;
         outputStringArray([result.content], `${dirpath}/content.html`);
 
-        const urlWithLinks: string[] = [];
+        const urlWithBacklinks: string[] = [];
+        const internalUrlWithBacklinks: string[] = [];
+        const externalUrlWithBacklinks: string[] = [];
         for (const link of result.links) {
-          urlWithLinks.push(serialize({"url": result.url, "link": link}));
+          if (link && link.trim()) {
+            const record = serialize({"url": link, "backlink": result.url});
+            urlWithBacklinks.push(record);
+            if (link.match(linkFilterRegex)) {
+              internalUrlWithBacklinks.push(record);
+            } else {
+              externalUrlWithBacklinks.push(record);
+            }
+          }
         }
-        outputStringArray(urlWithLinks, `${dirpath}/links.txt`);
-        outputStringArray(Array.from(internalLinks), `${dirpath}/internal_links.txt`);
-        outputStringArray(Array.from(externalLinks), `${dirpath}/external_links.txt`);
+        outputStringArray(urlWithBacklinks, `${dirpath}/links.txt`);
+        outputStringArray(internalUrlWithBacklinks, `${dirpath}/internal_links.txt`);
+        outputStringArray(externalUrlWithBacklinks, `${dirpath}/external_links.txt`);
 
         // ページ内のJavaScriptファイルを出力
         const jsUrls: string[] = [];
@@ -93,10 +91,10 @@ const crawlPages = (browserTypeStr: string, urlWithRules: UrlWithRule[], outputR
         outputStringArray(jsUrls, `${dirpath}/js_urls.txt`);  // JavaScriptのURLと保存先の関連のリストを保存
 
         outputStringArray([result.url], allProcessedUrlsPath, 'a');
-        outputStringArray([serialize({"url": result.url, "title": result.title, "keywords": result.keywords, "description": result.description, "bodyText": result.bodyText, "directory": dirpath})], allSummariesPath, 'a');
-        outputStringArray(urlWithLinks, allLinkUrlsPath, 'a');
-        outputStringArray(Array.from(internalLinks), allInternalLinkUrlsPath, 'a');
-        outputStringArray(Array.from(externalLinks), allExternalLinkUrlsPath, 'a');
+        outputStringArray([serialize({"url": result.url, "title": result.title, "keywords": result.keywords, "description": result.description, "bodyText": result.bodyText, "backlink": result.backlink, "directory": dirpath})], allSummariesPath, 'a');
+        outputStringArray(urlWithBacklinks, allLinkUrlsPath, 'a');
+        outputStringArray(internalUrlWithBacklinks, allInternalLinkUrlsPath, 'a');
+        outputStringArray(externalUrlWithBacklinks, allExternalLinkUrlsPath, 'a');
         const redirectedUrls: string[] = [];
         for (const [key, value] of Object.entries(result.redirectedUrls)) {
           redirectedUrls.push(serialize({'url': key, 'location': value}));

@@ -6,6 +6,11 @@ import StealthPlugin from 'puppeteer-extra-plugin-stealth'
 import { UrlWithRule } from '../types/url_with_rule';
 import * as setUtil from '../utils/set_util';
 
+const MIN_SLEEP_SEC = 1
+const MAX_SLEEP_SEC = 3
+const MAX_CONCURRENT_CRAWLS = 3
+
+
 export type CrawledResult = {
   url: string;
   title: string;
@@ -16,6 +21,7 @@ export type CrawledResult = {
   links: Set<string>;
   redirectedUrls: { [key: string]: string };
   jsFiles: { [key: string]: string };
+  backlink: string;
 };
 
 const mutex0 = new Mutex();
@@ -23,7 +29,7 @@ const ignoredLinkFilterRegex = new RegExp('^.*\.pdf$|^.*\.docx?$|^.*\.xlsx?$|^.*
 
 const sleep = (ms: number) => new Promise((res) => setTimeout(res, ms));
 
-const crawl = async (url: string, browserType: BrowserType): Promise<CrawledResult> => {
+const crawl = async (url: string, backlink: string, browserType: BrowserType): Promise<CrawledResult> => {
 
   const result: CrawledResult = {
     url: "",
@@ -34,7 +40,8 @@ const crawl = async (url: string, browserType: BrowserType): Promise<CrawledResu
     bodyText: "",
     links: new Set(),
     redirectedUrls: {},
-    jsFiles: {}
+    jsFiles: {},
+    backlink: "",
   };
   const browser = await browserType.launch();
   const context = await browser.newContext();
@@ -132,6 +139,11 @@ const crawl = async (url: string, browserType: BrowserType): Promise<CrawledResu
     // クロールしたURLをセット
     result.url = url;
 
+    // バックリンクURLをセット
+    if (backlink) {
+      result.backlink = backlink;
+    }
+
     return result;
   } catch (error) {
     console.error("catch error in crawl");
@@ -144,31 +156,40 @@ const crawl = async (url: string, browserType: BrowserType): Promise<CrawledResu
     }
     throw error;
   } finally {
-    await sleep((Math.random() + 1.0) * 3000); // ランダムに1〜3秒待つ
+    // ランダムに MIN_SLEEP_SEC 〜 MAX_SLEEP_SEC 秒待つ
+    await sleep((Math.random() + MIN_SLEEP_SEC) * MAX_SLEEP_SEC * 1000);
     await page.close();
     await context.close();
     await browser.close();
   }
 };
 
-const recursiveCrawl = async (allUrls: Set<string> = new Set(), linkFilterRegex: RegExp, linkDepth: number, browserType: BrowserType, processedUrls: Set<string>): Promise<void> => {
+const recursiveCrawl = async (
+    allUrls: Set<string> = new Set(),
+    backLinks: { [key: string]: string },
+    linkFilterRegex: RegExp,
+    linkDepth: number,
+    browserType: BrowserType,
+    processedUrls: Set<string>): Promise<void> => {
   try {
     const urls = Array.from(setUtil.difference(allUrls, processedUrls));
     const mutex1 = new Mutex();
     await mutex1.acquire();
     let urlsLength = urls.length;
-    const semaphore = new Semaphore(3);
+    const semaphore = new Semaphore(MAX_CONCURRENT_CRAWLS);
     urls.sort((a, b) => 0.5 - Math.random()).forEach(async (url) => {
       const [semaphoreValue, semaphoreRelease] = await semaphore.acquire();
       try {
         if (!url.match(linkFilterRegex)) {
           return;
         }
-        const result = await crawl(url, browserType);
+        const backlink = backLinks[url];
+        const result = await crawl(url, backlink, browserType);
         parentPort?.postMessage(result);
         processedUrls.add(url);
         for (const link of result.links) {
           allUrls.add(link);
+          backLinks[link] = url;
         }
       } catch (error) {
         console.error("catch error in recursiveCrawl 1");
@@ -190,7 +211,7 @@ const recursiveCrawl = async (allUrls: Set<string> = new Set(), linkFilterRegex:
     });
     await mutex1.waitForUnlock();
     if (linkDepth > 0 && setUtil.difference(allUrls, processedUrls).size > 0) {
-      await recursiveCrawl(allUrls, linkFilterRegex, linkDepth - 1, browserType, processedUrls);
+      await recursiveCrawl(allUrls, backLinks, linkFilterRegex, linkDepth - 1, browserType, processedUrls);
     } else {
       mutex0.release();
     }
@@ -227,10 +248,13 @@ const runCrawler = async (urlWithRule: UrlWithRule, browserTypeStr: string) => {
   }
   try {
     await mutex0.acquire();
-    const allUrls = new Set([urlWithRule.url]);
+    const url = urlWithRule.url;
+    const backlink = urlWithRule.backlink;
+    const allUrls = new Set([url]);
+    const backLinks = { url: backlink ? backlink : "" };
     const linkFilterRegex = urlWithRule.filter ? new RegExp(urlWithRule.filter): new RegExp((new URL(urlWithRule.url)).hostname.replaceAll('.', '\.'));
     const linkDepth = urlWithRule.depth ? urlWithRule.depth : 0;
-    await recursiveCrawl(allUrls, linkFilterRegex, linkDepth, browserType, new Set());
+    await recursiveCrawl(allUrls, backLinks, linkFilterRegex, linkDepth, browserType, new Set());
   } catch (error) {
     console.error("catch error in crawlPages");
     if (error instanceof Error) {
