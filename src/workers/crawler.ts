@@ -9,7 +9,7 @@ import * as setUtil from '../utils/set_util';
 const Y_SCROLL_STEP = 500
 const MIN_SLEEP_SEC = 1
 const MAX_SLEEP_SEC = 3
-const MAX_CONCURRENT_CRAWLS = 3
+const MAX_CONCURRENT_CRAWLS = 5
 
 
 export type CrawledResult = {
