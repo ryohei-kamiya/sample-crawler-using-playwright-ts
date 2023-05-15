@@ -1,6 +1,6 @@
 import { toASCII as punycodeEncode } from 'punycode';
 import { URL } from 'node:url';
-import { readFileSync, createWriteStream, mkdirSync, symlinkSync } from 'fs';
+import { readFileSync, writeFileSync, mkdirSync, symlinkSync } from 'fs';
 import { parse as csvParse } from 'csv-parse/sync';
 import * as crypto from 'crypto';
 import { UrlWithRule } from '../types/url_with_rule';
@@ -57,12 +57,8 @@ export const serialize = (_data: any): string => {
 };
 
 export const outputStringArray = (lines: string[], filepath: string, flags: string = "w"): void => {
-  const writeStream = createWriteStream(filepath, { flags: flags });
   if (lines && lines.length > 0) {
-    writeStream.write(`${lines.join('\n')}\n`, 'utf-8', () => {
-      // コールバック関数内で書き込み完了後の処理を行う
-      writeStream.end();
-    });
+    writeFileSync(filepath, `${lines.join('\n')}\n`, {encoding: 'utf-8', flag: flags});
   }
 };
 
