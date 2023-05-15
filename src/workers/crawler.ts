@@ -6,6 +6,7 @@ import StealthPlugin from 'puppeteer-extra-plugin-stealth'
 import { UrlWithRule } from '../types/url_with_rule';
 import * as setUtil from '../utils/set_util';
 
+const Y_SCROLL_STEP = 500
 const MIN_SLEEP_SEC = 1
 const MAX_SLEEP_SEC = 3
 const MAX_CONCURRENT_CRAWLS = 3
@@ -115,6 +116,39 @@ const crawl = async (url: string, backlink: string, browserType: BrowserType): P
         result.bodyText = bodyText.replace(/\s+/g, ' ');
       }
     }
+
+    /*
+    * ここから、スクロールでリンク一覧を読み込むタイプのページ向けの処理
+    */
+
+    // window.scrollYの最大値を取得
+    let maxScrollY = await page.evaluate(() => {
+      return document.documentElement.scrollHeight - window.innerHeight;
+    });
+    let scrollPosition = {x: 0, y: 0};
+    while (scrollPosition.y < maxScrollY - Y_SCROLL_STEP) {
+      // ページを特定の量だけスクロール
+      await page.evaluate(() => {
+        window.scrollBy(0, Y_SCROLL_STEP);  // Y方向に Y_SCROLL_STEP px だけスクロール
+      });
+      // 現在のスクロール位置を取得
+      scrollPosition = await page.evaluate(() => {
+        return {
+          x: window.scrollX,
+          y: window.scrollY,
+        };
+      });
+      // window.scrollYの最大値を更新
+      maxScrollY = await page.evaluate(() => {
+        return document.documentElement.scrollHeight - window.innerHeight;
+      });
+      // ランダムに MIN_SLEEP_SEC 〜 MAX_SLEEP_SEC 秒待つ
+      await sleep((Math.random() + MIN_SLEEP_SEC) * MAX_SLEEP_SEC * 1000);
+    }
+
+    /*
+    * ここまで、スクロールでリンク一覧を読み込むタイプのページ向けの処理
+    */
 
     // リンク一覧を抽出
     const linkLocators = page.locator('a');
