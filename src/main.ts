@@ -6,6 +6,9 @@ import { url2dirpath, makedir, loadUrlWithRulesInFile, serialize, outputStringAr
 import { UrlWithRule } from './types/url_with_rule';
 import { CrawledResult } from './workers/crawler';
 
+const MAX_CONCURRENT_TOP_LEVEL_CRAWLS = 10
+
+
 const crawlPages = (browserTypeStr: string, urlWithRules: UrlWithRule[], outputRootDir: string): void => {
   const browserDirPath = `${outputRootDir}/${browserTypeStr}`;
   makedir(browserDirPath);
@@ -18,7 +21,7 @@ const crawlPages = (browserTypeStr: string, urlWithRules: UrlWithRule[], outputR
   const allExternalLinkUrlsPath = `${browserDirPath}/all_external_link_urls.txt`;
   const allSummariesPath = `${browserDirPath}/all_summaries.txt`;
 
-  const semaphore = new Semaphore(3);
+  const semaphore = new Semaphore(MAX_CONCURRENT_TOP_LEVEL_CRAWLS);
 
   urlWithRules.sort((a, b) => 0.5 - Math.random()).forEach(async (urlWithRule: UrlWithRule) => {
     const url = urlWithRule.url;
