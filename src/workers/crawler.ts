@@ -174,9 +174,7 @@ const crawl = async (url: string, backlink: string, browserType: BrowserType): P
     result.url = url;
 
     // バックリンクURLをセット
-    if (backlink) {
-      result.backlink = backlink;
-    }
+    result.backlink = backlink;
 
     return result;
   } catch (error) {
@@ -283,9 +281,9 @@ const runCrawler = async (urlWithRule: UrlWithRule, browserTypeStr: string) => {
   try {
     await mutex0.acquire();
     const url = urlWithRule.url;
-    const backlink = urlWithRule.backlink;
+    const backlink = urlWithRule.backlink ? urlWithRule.backlink : "";
     const allUrls = new Set([url]);
-    const backLinks = { url: backlink ? backlink : "" };
+    const backLinks: { [key: string]: string } = {}; backLinks[url] = backlink;
     const linkFilterRegex = urlWithRule.filter ? new RegExp(urlWithRule.filter): new RegExp((new URL(urlWithRule.url)).hostname.replaceAll('.', '\.'));
     const linkDepth = urlWithRule.depth ? urlWithRule.depth : 0;
     await recursiveCrawl(allUrls, backLinks, linkFilterRegex, linkDepth, browserType, new Set());
